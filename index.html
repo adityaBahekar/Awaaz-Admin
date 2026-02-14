@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMC Command Center</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#1a1f2c', // Sidebar color
+                            orange: '#f97316', // Accent
+                            bg: '#f3f4f6', // Main bg
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Chart container height fixes */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-brand-bg text-slate-800 font-sans antialiased overflow-hidden transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100">
+
+    <div id="app" class="flex h-screen w-full">
+        <!-- Sidebar and Content will be injected here by JS -->
+    </div>
+
+    <script>
+        // --- DATA STORE (Mock Database) ---
+        const store = {
+            currentUser: {
+                name: "Admin User",
+                role: "Municipal Corp",
+                initials: "AK"
+            },
+            stats: {
+                complaints: 12,
+                pending: 6,
+                resolved: 2,
+                critical: 4
+            },
+            recentActivity: [
+                { id: 1, title: "Tree Fallen on Dastur Nagar Road", type: "Environment", location: "Dastur Nagar", time: "1h ago", color: "bg-red-500" },
+                { id: 2, title: "Illegal Parking at Irwin Square", type: "Traffic", location: "Irwin Square", time: "3h ago", color: "bg-blue-500" },
+                { id: 3, title: "No Water Supply in Gadge Nagar", type: "Water", location: "Gadge Nagar", time: "5h ago", color: "bg-cyan-500" },
+                { id: 4, title: "Drainage Blockage in Badnera", type: "Sanitation", location: "Old Badnera", time: "6h ago", color: "bg-purple-500" },
+                { id: 5, title: "Broken Pipeline in Rukhmini...", type: "Plumbing", location: "Rukhmini Nagar", time: "12h ago", color: "bg-orange-500" },
+                { id: 6, title: "Street Light Repair", type: "Electric", location: "Camp Area", time: "14h ago", color: "bg-yellow-500" },
+                { id: 7, title: "Garbage Collection Delayed", type: "Sanitation", location: "Sai Nagar", time: "1d ago", color: "bg-gray-500" }
+            ],
+            criticalIssues: [
+                {
+                    id: "TKT-3921",
+                    priority: "High Priority",
+                    priorityColor: "bg-red-100 text-red-600 border-red-200",
+                    title: "No Water Supply in Gadge Nagar",
+                    desc: "Residents of Lane 4, Gadge Nagar have not received water supply for the last 24 hours. Multiple reports received indicating pipeline failure.",
+                    dept: "Water Dept",
+                    assigned: "R. Patil",
+                    status: "SLA Breached in 2h",
+                    statusColor: "text-red-600",
+                    timeReported: "05h 12m",
+                    icon: "fa-faucet-drip"
+                },
+                {
+                    id: "TKT-3905",
+                    priority: "High Priority",
+                    priorityColor: "bg-red-100 text-red-600 border-red-200",
+                    title: "Drainage Blockage in Badnera",
+                    desc: "Drainage water entering homes in Old Badnera due to severe main line blockage. Health hazard risk increasing.",
+                    dept: "Sanitation",
+                    assigned: "Unassigned",
+                    status: "SLA Breach: 4h left",
+                    statusColor: "text-amber-600",
+                    timeReported: "06h 45m",
+                    icon: "fa-biohazard"
+                },
+                {
+                    id: "TKT-3880",
+                    priority: "Urgent",
+                    priorityColor: "bg-orange-100 text-orange-600 border-orange-200",
+                    title: "Open Manhole near Railway Station",
+                    desc: "Dangerous open manhole on the main footpath leading to Amravati Railway Station. High accident risk for pedestrians.",
+                    dept: "Roads Dept",
+                    assigned: "A. Singh",
+                    status: "Standard SLA",
+                    statusColor: "text-slate-500",
+                    timeReported: "48h 10m",
+                    icon: "fa-road"
+                }
+            ],
+            grievances: [
+                { id: "#GRV-2024-001", title: "Broken Pipe...", date: "2 hrs ago • Sector 4", priority: "Critical", dept: "Water Supply", status: "On-Site", assigneeColor: "bg-emerald-400" },
+                { id: "#GRV-2024-002", title: "Street Light...", date: "5 hrs ago • Sector 2", priority: "High", dept: "Electrical", status: "Assigned", assigneeColor: "bg-yellow-400" },
+                { id: "#GRV-2024-003", title: "Garbage Pile...", date: "1 day ago • Sector 9", priority: "Medium", dept: "Sanitation", status: "In Queue", assigneeColor: "bg-gray-300" },
+                { id: "#GRV-2024-004", title: "Pothole Repa...", date: "2 days ago • Sector 1", priority: "Low", dept: "Roads", status: "Resolved", assigneeColor: "bg-blue-400" },
+                { id: "#GRV-2024-005", title: "Illegal Parkin...", date: "3 hrs ago • Sector 12", priority: "Medium", dept: "Traffic", status: "In Queue", assigneeColor: "bg-gray-300" },
+                { id: "#GRV-2024-006", title: "Fallen Tree o...", date: "45 mins ago • Sector 7", priority: "Critical", dept: "Sanitation", status: "Assigned", assigneeColor: "bg-red-400" },
+            ],
+            workforce: [
+                { id: "#GRV-2026-892", title: "Water Main Burst", location: "Sector 4, MG Road", officer: "Officer Ramesh Kumar", unitId: "W-102", dept: "Water Works", status: "In Progress", duration: "2h 15m", avatar: "RK" },
+                { id: "#GRV-2026-895", title: "Street Light Outage", location: "Block C, Park Avenue", officer: "Tech. Sarah Jen", unitId: "E-045", dept: "Electricity", status: "Dispatched", duration: "45m", avatar: "SJ" },
+                { id: "#GRV-2026-901", title: "Illegal Dump Clearance", location: "North Zone, Market", officer: "Unassigned", unitId: "Pending", dept: "Sanitation", status: "Critical Pending", duration: "4h 30m", avatar: "?" },
+                { id: "#GRV-2026-884", title: "Pothole Repair", location: "Ring Road, Exit 5", officer: "Supv. Mike Ross", unitId: "R-221", dept: "Roads", status: "In Progress", duration: "1h 10m", avatar: "MR" },
+                 { id: "#GRV-2026-912", title: "Tree Fallen on Road", location: "Green Park Main", officer: "Insp. Anita Roy", unitId: "G-007", dept: "Horticulture", status: "Dispatched", duration: "15m", avatar: "AR" },
+            ]
+        };
+
+        // --- STATE MANAGEMENT ---
+        let state = {
+            currentTab: 'dashboard', // dashboard, grievances, workforce, analytics, settings
+            darkMode: false
+        };
+
+        // --- CHARTS INSTANCES (to destroy before re-rendering) ---
+        let charts = {};
+
+        // --- COMPONENTS ---
+
+        function Sidebar() {
+            const menuItems = [
+                { id: 'dashboard', label: 'Dashboard', icon: 'fa-grip' },
+                { id: 'map', label: 'Live Map', icon: 'fa-map' },
+                { id: 'analytics', label: 'Analytics', icon: 'fa-chart-simple' },
+                { id: 'grievances', label: 'Grievances', icon: 'fa-triangle-exclamation' }, // Grievance icon
+                { id: 'workforce', label: 'Workforce', icon: 'fa-users-gear' },
+                { id: 'settings', label: 'Settings', icon: 'fa-gear' },
+            ];
+
+            return `
+                <aside class="w-64 bg-brand-dark text-white flex flex-col h-full flex-shrink-0 transition-all duration-300">
+                    <!-- Logo -->
+                    <div class="h-20 flex items-center px-6 border-b border-white/10">
+                        <div class="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center text-orange-500 mr-3">
+                            <i class="fa-solid fa-shield-halved text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-lg leading-tight">AMC</h1>
+                            <p class="text-xs text-slate-400 uppercase tracking-wider">Command Center</p>
+                        </div>
+                    </div>
+
+                    <!-- Navigation -->
+                    <nav class="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
+                        ${menuItems.map(item => `
+                            <button onclick="switchTab('${item.id}')" 
+                                class="w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${state.currentTab === item.id 
+                                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' 
+                                    : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
+                                <span class="w-6 flex justify-center mr-3 text-lg ${state.currentTab === item.id ? 'text-white' : 'text-slate-500 group-hover:text-white'}">
+                                    <i class="fa-solid ${item.icon}"></i>
+                                </span>
+                                <span class="font-medium">${item.label}</span>
+                                ${item.id === 'grievances' ? '<span class="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">4</span>' : ''}
+                            </button>
+                        `).join('')}
+                    </nav>
+
+                    <!-- System Status -->
+                    <div class="p-6 border-t border-white/10">
+                        <div class="flex items-center gap-3">
+                            <span class="relative flex h-3 w-3">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                            </span>
+                            <div>
+                                <p class="text-sm font-medium text-emerald-400">System Status</p>
+                                <p class="text-xs text-slate-500">All systems operational</p>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            `;
+        }
+
+        function Header(title) {
+            const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            
+            return `
+                <header class="h-20 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between px-8 flex-shrink-0 transition-colors duration-300">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800 dark:text-white">${title}</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">${today}</p>
+                    </div>
+
+                    <div class="flex items-center gap-6">
+                        <!-- Search -->
+                        <div class="relative hidden md:block">
+                            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" placeholder="Search complaints..." 
+                                class="pl-11 pr-4 py-2.5 bg-gray-100 dark:bg-slate-700 dark:text-white rounded-full text-sm w-64 focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all">
+                        </div>
+
+                        <!-- Actions -->
+                        <button class="relative text-slate-500 hover:text-orange-600 transition-colors">
+                            <i class="fa-regular fa-bell text-xl"></i>
+                            <span class="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>
+                        </button>
+                        
+                        <button onclick="toggleTheme()" class="text-slate-500 hover:text-indigo-600 transition-colors">
+                            <i class="fa-solid ${state.darkMode ? 'fa-sun' : 'fa-moon'} text-xl"></i>
+                        </button>
+
+                        <!-- Profile -->
+                        <div class="flex items-center gap-3 pl-6 border-l border-gray-200 dark:border-slate-700">
+                            <div class="text-right hidden sm:block">
+                                <p class="text-sm font-bold text-slate-800 dark:text-white">${store.currentUser.name}</p>
+                                <p class="text-xs text-slate-500">${store.currentUser.role}</p>
+                            </div>
+                            <div class="h-10 w-10 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                ${store.currentUser.initials}
+                            </div>
+                        </div>
+                    </div>
+                </header>
+            `;
+        }
+
+        function StatCard(title, value, subtext, colorClass, icon) {
+            return `
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div class="relative z-10">
+                        <p class="text-xs font-bold uppercase tracking-wider text-white/80 mb-1">${title}</p>
+                        <h3 class="text-4xl font-bold text-white mb-2">${value}</h3>
+                        <div class="h-1 w-full bg-black/20 rounded-full overflow-hidden">
+                            <div class="h-full bg-white/50 w-2/3"></div>
+                        </div>
+                    </div>
+                    <!-- Background Color Block -->
+                    <div class="absolute inset-0 ${colorClass}"></div>
+                    <!-- Decorative Icon -->
+                    <i class="fa-solid ${icon} absolute -right-4 -bottom-4 text-8xl text-black/10 group-hover:scale-110 transition-transform duration-500"></i>
+                </div>
+            `;
+        }
+
+        function DashboardView() {
+            return `
+                <div class="flex flex-col h-full overflow-hidden">
+                    ${Header('Dashboard Overview')}
+                    
+                    <main class="flex-1 overflow-y-auto p-8 fade-in">
+                        <!-- Stats Row -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            ${StatCard('Total Complaints', store.stats.complaints, '', 'bg-slate-800', 'fa-chart-line')}
+                            ${StatCard('Pending', store.stats.pending, '', 'bg-orange-500', 'fa-clock')}
+                            ${StatCard('Resolved', store.stats.resolved, '', 'bg-emerald-500', 'fa-check-circle')}
+                            ${StatCard('Critical Pending', store.stats.critical, '', 'bg-red-500', 'fa-triangle-exclamation')}
+                        </div>
+
+                        <div class="flex flex-col lg:flex-row gap-8">
+                            <!-- Left: Critical Attention -->
+                            <div class="flex-1 space-y-6">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div class="h-8 w-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+                                        <i class="fa-solid fa-shield-virus"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-lg text-slate-800 dark:text-white">Critical Attention Required</h3>
+                                        <p class="text-xs text-slate-500">Issues marked as high priority needing immediate intervention.</p>
+                                    </div>
+                                </div>
+
+                                ${store.criticalIssues.map(issue => `
+                                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition-all">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div class="flex items-center gap-3">
+                                                <span class="px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${issue.priorityColor}">
+                                                    ${issue.priority}
+                                                </span>
+                                                <span class="text-xs text-slate-400 font-mono">${issue.id}</span>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Time Since Reported</p>
+                                                <p class="text-xl font-bold text-slate-700 dark:text-slate-200">${issue.timeReported}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <h4 class="text-lg font-bold text-slate-800 dark:text-white mb-2">${issue.title}</h4>
+                                        <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">${issue.desc}</p>
+                                        
+                                        <div class="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-700">
+                                            <div class="flex items-center gap-6 text-xs font-medium text-slate-500 dark:text-slate-400">
+                                                <span class="flex items-center gap-2"><i class="fa-solid ${issue.icon}"></i> ${issue.dept}</span>
+                                                <span class="flex items-center gap-2"><i class="fa-regular fa-user"></i> ${issue.assigned}</span>
+                                                <span class="flex items-center gap-2 ${issue.statusColor}"><i class="fa-solid fa-stopwatch"></i> ${issue.status}</span>
+                                            </div>
+                                            <button class="bg-red-50 hover:bg-red-100 text-red-600 px-5 py-2 rounded-lg text-sm font-semibold transition-colors">
+                                                Take Action
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <!-- Right: Recent Activity -->
+                            <div class="lg:w-96 flex-shrink-0">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h3 class="font-bold text-lg text-slate-800 dark:text-white">Recent Activity</h3>
+                                    <a href="#" class="text-xs font-bold text-orange-500 hover:text-orange-600 flex items-center gap-1">View Log <i class="fa-solid fa-arrow-right"></i></a>
+                                </div>
+
+                                <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-slate-700 h-[calc(100vh-280px)] overflow-y-auto">
+                                    <div class="relative pl-4 border-l border-gray-200 dark:border-slate-700 space-y-8">
+                                        ${store.recentActivity.map(act => `
+                                            <div class="relative">
+                                                <!-- Dot -->
+                                                <div class="absolute -left-[21px] top-1.5 h-3 w-3 rounded-full ${act.color} ring-4 ring-white dark:ring-slate-800"></div>
+                                                
+                                                <div class="flex justify-between items-start">
+                                                    <div>
+                                                        <h5 class="text-sm font-semibold text-slate-800 dark:text-white leading-tight mb-1">${act.title}</h5>
+                                                        <div class="flex items-center gap-2 text-[11px]">
+                                                            <span class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">${act.type}</span>
+                                                            <span class="text-slate-400">${act.location}</span>
+                                                        </div>
+                                                    </div>
+                                                    <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap ml-2">${act.time}</span>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            `;
+        }
+
+        function GrievancesView() {
+            return `
+                 <div class="flex flex-col h-full overflow-hidden">
+                    ${Header('Grievances Management')}
+                    <main class="flex-1 overflow-y-auto p-8 fade-in">
+                        <!-- Filters -->
+                        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
+                            <div class="flex gap-3 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
+                                <select class="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm rounded-lg p-2.5 focus:ring-orange-500 focus:border-orange-500">
+                                    <option>All Priorities</option>
+                                    <option>Critical</option>
+                                </select>
+                                <select class="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm rounded-lg p-2.5 focus:ring-orange-500 focus:border-orange-500">
+                                    <option>All Status</option>
+                                    <option>Pending</option>
+                                </select>
+                                <select class="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm rounded-lg p-2.5 focus:ring-orange-500 focus:border-orange-500">
+                                    <option>All Departments</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-4 w-full md:w-auto">
+                                <span class="text-xs text-slate-500 whitespace-nowrap">Showing 1-6 of 128</span>
+                                <button class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 shadow-lg shadow-orange-500/30">
+                                    <i class="fa-solid fa-plus"></i> New Ticket
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Table -->
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+                            <table class="w-full text-left text-sm text-slate-600 dark:text-slate-400">
+                                <thead class="bg-gray-50 dark:bg-slate-900/50 text-xs uppercase text-slate-400 font-bold tracking-wider border-b border-gray-100 dark:border-slate-700">
+                                    <tr>
+                                        <th class="p-4 w-4"><input type="checkbox" class="rounded border-gray-300 text-orange-500 focus:ring-orange-500"></th>
+                                        <th class="p-4">Complaint ID</th>
+                                        <th class="p-4">Description</th>
+                                        <th class="p-4">Priority</th>
+                                        <th class="p-4">Department</th>
+                                        <th class="p-4">Status</th>
+                                        <th class="p-4">Assignee</th>
+                                        <th class="p-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
+                                    ${store.grievances.map(g => {
+                                        let priorityBadge = g.priority === 'Critical' ? 'bg-red-100 text-red-600' : 
+                                                            g.priority === 'High' ? 'bg-orange-100 text-orange-600' :
+                                                            g.priority === 'Medium' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600';
+                                        
+                                        let statusBadge = g.status === 'Resolved' ? 'text-emerald-500 bg-emerald-50 border-emerald-200' :
+                                                          g.status === 'On-Site' ? 'text-orange-500 bg-orange-50 border-orange-200' : 'text-blue-500 bg-blue-50 border-blue-200';
+
+                                        return `
+                                        <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+                                            <td class="p-4"><input type="checkbox" class="rounded border-gray-300 text-orange-500 focus:ring-orange-500"></td>
+                                            <td class="p-4 font-mono text-xs text-slate-500">${g.id}</td>
+                                            <td class="p-4">
+                                                <div class="flex gap-3 items-center">
+                                                    <div class="h-10 w-10 rounded-lg bg-slate-200 dark:bg-slate-600 overflow-hidden flex-shrink-0">
+                                                       <!-- Placeholder image block -->
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-bold text-slate-800 dark:text-white">${g.title}</p>
+                                                        <p class="text-[11px] text-slate-400">${g.date}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="p-4"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${priorityBadge}">${g.priority}</span></td>
+                                            <td class="p-4"><div class="flex items-center gap-2"><div class="h-2 w-2 rounded-full bg-blue-400"></div>${g.dept}</div></td>
+                                            <td class="p-4"><span class="px-2.5 py-1 rounded border text-[11px] font-medium ${statusBadge}">${g.status}</span></td>
+                                            <td class="p-4">
+                                                ${g.status === 'In Queue' ? '<span class="text-xs italic text-slate-400">Unassigned</span>' : `<div class="h-8 w-8 rounded-full ${g.assigneeColor} border-2 border-white dark:border-slate-800"></div>`}
+                                            </td>
+                                            <td class="p-4"><button class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-ellipsis-vertical"></i></button></td>
+                                        </tr>
+                                        `
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                            
+                            <!-- Pagination -->
+                            <div class="p-4 flex justify-end gap-2 border-t border-gray-100 dark:border-slate-700">
+                                <button class="px-3 py-1 text-sm border border-gray-200 dark:border-slate-600 rounded hover:bg-gray-50 dark:hover:bg-slate-700 dark:text-white transition-colors">Previous</button>
+                                <button class="px-3 py-1 text-sm bg-orange-500 text-white rounded shadow-md">1</button>
+                                <button class="px-3 py-1 text-sm border border-gray-200 dark:border-slate-600 rounded hover:bg-gray-50 dark:hover:bg-slate-700 dark:text-white transition-colors">2</button>
+                                <button class="px-3 py-1 text-sm border border-gray-200 dark:border-slate-600 rounded hover:bg-gray-50 dark:hover:bg-slate-700 dark:text-white transition-colors">Next</button>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            `;
+        }
+
+        function WorkforceView() {
+            return `
+                <div class="flex flex-col h-full overflow-hidden">
+                    ${Header('Workforce Assignment')}
+                    <main class="flex-1 overflow-y-auto p-8 fade-in">
+                        <!-- Stats -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex justify-between items-center">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-500">Active Tasks</p>
+                                    <h3 class="text-3xl font-bold text-slate-800 dark:text-white mt-1">142</h3>
+                                    <p class="text-xs text-emerald-500 font-bold mt-1"><i class="fa-solid fa-arrow-trend-up"></i> +12 today</p>
+                                </div>
+                                <div class="h-12 w-12 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-xl"><i class="fa-solid fa-clipboard-list"></i></div>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex justify-between items-center">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-500">Field Officers Online</p>
+                                    <h3 class="text-3xl font-bold text-slate-800 dark:text-white mt-1">38</h3>
+                                    <p class="text-xs text-slate-400 mt-1">85% Availability</p>
+                                </div>
+                                <div class="h-12 w-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center text-xl"><i class="fa-solid fa-user-gear"></i></div>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 flex justify-between items-center">
+                                <div>
+                                    <p class="text-sm font-semibold text-red-500">Critical Unassigned</p>
+                                    <h3 class="text-3xl font-bold text-red-600 mt-1">5</h3>
+                                    <p class="text-xs text-red-400 mt-1">Action Required Immediately</p>
+                                </div>
+                                <div class="h-12 w-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            </div>
+                        </div>
+
+                        <!-- Assignment List -->
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+                            <div class="p-6 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center">
+                                <div>
+                                    <h3 class="font-bold text-lg text-slate-800 dark:text-white">Active Assignments</h3>
+                                    <p class="text-xs text-slate-500">Real-time status of dispatched units</p>
+                                </div>
+                                <div class="flex gap-3">
+                                    <button class="px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700"><i class="fa-solid fa-filter mr-2"></i> Filter</button>
+                                    <button class="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 shadow-md"><i class="fa-solid fa-plus mr-2"></i> New Assignment</button>
+                                </div>
+                            </div>
+                            
+                            <div class="divide-y divide-gray-100 dark:divide-slate-700">
+                                ${store.workforce.map(w => `
+                                    <div class="p-6 hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors group">
+                                        <div class="flex items-center justify-between">
+                                            <div class="w-1/4">
+                                                <p class="text-xs text-slate-400 font-mono mb-1">${w.id}</p>
+                                                <h4 class="font-bold text-slate-800 dark:text-white mb-1">${w.title}</h4>
+                                                <p class="text-xs text-slate-500"><i class="fa-solid fa-location-dot mr-1"></i> ${w.location}</p>
+                                            </div>
+                                            
+                                            <div class="w-1/4 flex items-center gap-3">
+                                                ${w.officer === 'Unassigned' 
+                                                    ? `<div class="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400 text-xs italic">?</div>`
+                                                    : `<div class="h-10 w-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-400 flex items-center justify-center text-xs font-bold text-slate-700 shadow-inner">${w.avatar}</div>`
+                                                }
+                                                <div>
+                                                    <p class="text-sm font-bold text-slate-700 dark:text-slate-200">${w.officer}</p>
+                                                    <p class="text-xs text-slate-400">${w.unitId === 'Pending' ? '<span class="italic">Pending Assignment</span>' : 'Unit ID: ' + w.unitId}</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="w-1/6">
+                                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">${w.dept}</span>
+                                            </div>
+                                            
+                                            <div class="w-1/6">
+                                                <span class="px-3 py-1 rounded border text-xs font-bold 
+                                                    ${w.status === 'Critical Pending' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-amber-50 text-amber-600 border-amber-100'}">
+                                                    ${w.status}
+                                                </span>
+                                            </div>
+                                            
+                                            <div class="w-1/6 flex justify-between items-center">
+                                                <span class="text-sm font-mono text-slate-500 ${w.status === 'Critical Pending' ? 'text-red-500 font-bold animate-pulse' : ''}"><i class="fa-regular fa-clock mr-1"></i> ${w.duration}</span>
+                                                ${w.status === 'Critical Pending' 
+                                                    ? `<button class="bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-1.5 rounded shadow-lg shadow-orange-500/30">Assign Now</button>` 
+                                                    : `<button class="text-slate-300 hover:text-orange-500 transition-colors"><i class="fa-regular fa-eye"></i></button>`
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            `;
+        }
+
+        function AnalyticsView() {
+            setTimeout(initCharts, 100); // Initialize charts after render
+            return `
+                <div class="flex flex-col h-full overflow-hidden">
+                    ${Header('Performance Insights')}
+                    <main class="flex-1 overflow-y-auto p-8 fade-in">
+                        <!-- KPI Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 relative overflow-hidden">
+                                <div class="relative z-10">
+                                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Resolution Rate</p>
+                                    <div class="flex items-end gap-3">
+                                        <h3 class="text-4xl font-bold text-slate-800 dark:text-white">92%</h3>
+                                        <span class="text-sm font-bold text-emerald-500 mb-1"><i class="fa-solid fa-arrow-up"></i> 2.4%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-100 dark:bg-slate-700 h-1.5 rounded-full mt-4 overflow-hidden">
+                                        <div class="bg-blue-500 h-full rounded-full" style="width: 92%"></div>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 mt-2">Target: 90% achieved</p>
+                                </div>
+                                <div class="absolute right-0 top-0 p-6 opacity-10"><i class="fa-solid fa-check-double text-6xl text-blue-500"></i></div>
+                            </div>
+
+                             <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 relative overflow-hidden">
+                                <div class="relative z-10">
+                                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">User Satisfaction</p>
+                                    <div class="flex items-end gap-3">
+                                        <h3 class="text-4xl font-bold text-slate-800 dark:text-white">4.8<span class="text-lg text-slate-400">/5</span></h3>
+                                    </div>
+                                    <div class="flex text-amber-400 text-sm mt-3 gap-1">
+                                        <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star-half-stroke"></i>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 mt-2">Based on 850 reviews</p>
+                                </div>
+                                <div class="absolute right-0 top-0 p-6 opacity-10"><i class="fa-solid fa-star text-6xl text-amber-500"></i></div>
+                            </div>
+
+                             <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 relative overflow-hidden">
+                                <div class="relative z-10">
+                                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Active Field Units</p>
+                                    <div class="flex items-end gap-3">
+                                        <h3 class="text-4xl font-bold text-slate-800 dark:text-white">24<span class="text-lg text-slate-400">/30</span></h3>
+                                    </div>
+                                    <div class="flex -space-x-2 mt-4">
+                                        <div class="h-8 w-8 rounded-full border-2 border-white bg-gray-300"></div>
+                                        <div class="h-8 w-8 rounded-full border-2 border-white bg-gray-400"></div>
+                                        <div class="h-8 w-8 rounded-full border-2 border-white bg-gray-500"></div>
+                                        <div class="h-8 w-8 rounded-full border-2 border-white bg-slate-800 text-white text-[10px] flex items-center justify-center font-bold">+20</div>
+                                    </div>
+                                </div>
+                                <div class="absolute right-0 top-0 p-6 opacity-10"><i class="fa-solid fa-truck-fast text-6xl text-emerald-500"></i></div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Row 1 -->
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                            <!-- Line Chart -->
+                            <div class="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h3 class="font-bold text-slate-800 dark:text-white">Trend Analysis</h3>
+                                    <div class="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
+                                        <button class="px-3 py-1 text-xs font-medium rounded text-slate-500 hover:text-slate-800 dark:text-slate-400">Week</button>
+                                        <button class="px-3 py-1 text-xs font-medium bg-white dark:bg-slate-600 text-orange-500 shadow-sm rounded">Month</button>
+                                        <button class="px-3 py-1 text-xs font-medium rounded text-slate-500 hover:text-slate-800 dark:text-slate-400">Year</button>
+                                    </div>
+                                </div>
+                                <div class="chart-container">
+                                    <canvas id="trendChart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Donut Chart -->
+                            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+                                <h3 class="font-bold text-slate-800 dark:text-white mb-2">Category Breakdown</h3>
+                                <p class="text-xs text-slate-500 mb-6">Distribution by department</p>
+                                <div class="chart-container relative flex items-center justify-center">
+                                    <canvas id="categoryChart"></canvas>
+                                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <span class="text-3xl font-bold text-slate-800 dark:text-white">1.2k</span>
+                                        <span class="text-[10px] text-slate-500 uppercase tracking-widest">Total</span>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4 mt-6">
+                                    <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span><span class="text-xs text-slate-500">Road (35%)</span></div>
+                                    <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-cyan-400"></span><span class="text-xs text-slate-500">Water (25%)</span></div>
+                                    <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-xs text-slate-500">Electric (20%)</span></div>
+                                    <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-xs text-slate-500">Sanitation (20%)</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Bottom Row -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+                                <h3 class="font-bold text-slate-800 dark:text-white mb-4">Response Time Heatmap</h3>
+                                <div class="space-y-3">
+                                    <div class="grid grid-cols-5 gap-2 text-xs text-slate-500 font-medium text-center mb-1">
+                                        <div></div><div>North</div><div>South</div><div>East</div><div>West</div>
+                                    </div>
+                                    <div class="grid grid-cols-5 gap-2 items-center">
+                                        <div class="text-xs font-bold text-slate-600 dark:text-slate-300">Roads</div>
+                                        <div class="h-8 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">1.2h</div>
+                                        <div class="h-8 rounded bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">3.5h</div>
+                                        <div class="h-8 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-bold">1.8h</div>
+                                        <div class="h-8 rounded bg-red-100 text-red-700 flex items-center justify-center text-xs font-bold">8.2h</div>
+                                    </div>
+                                     <div class="grid grid-cols-5 gap-2 items-center">
+                                        <div class="text-xs font-bold text-slate-600 dark:text-slate-300">Water</div>
+                                        <div class="h-8 rounded bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">4.1h</div>
+                                        <div class="h-8 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">2.2h</div>
+                                        <div class="h-8 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-bold">1.5h</div>
+                                        <div class="h-8 rounded bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-bold">3.1h</div>
+                                    </div>
+                                </div>
+                             </div>
+
+                             <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="font-bold text-slate-800 dark:text-white">Top Performing Depts</h3>
+                                    <span class="text-xs text-orange-500 font-bold cursor-pointer">View Report</span>
+                                </div>
+                                <div class="space-y-4">
+                                    <div>
+                                        <div class="flex justify-between text-xs mb-1">
+                                            <span class="font-medium text-slate-600 dark:text-slate-300">Sanitation Dept</span>
+                                            <span class="font-bold text-emerald-500">98%</span>
+                                        </div>
+                                        <div class="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width: 98%"></div></div>
+                                    </div>
+                                     <div>
+                                        <div class="flex justify-between text-xs mb-1">
+                                            <span class="font-medium text-slate-600 dark:text-slate-300">Water Works</span>
+                                            <span class="font-bold text-emerald-500">94%</span>
+                                        </div>
+                                        <div class="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden"><div class="h-full bg-emerald-400 rounded-full" style="width: 94%"></div></div>
+                                    </div>
+                                     <div>
+                                        <div class="flex justify-between text-xs mb-1">
+                                            <span class="font-medium text-slate-600 dark:text-slate-300">Electricity Board</span>
+                                            <span class="font-bold text-amber-500">82%</span>
+                                        </div>
+                                        <div class="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden"><div class="h-full bg-amber-400 rounded-full" style="width: 82%"></div></div>
+                                    </div>
+                                </div>
+                             </div>
+                        </div>
+                    </main>
+                </div>
+            `;
+        }
+
+        // --- RENDER LOGIC ---
+
+        function render() {
+            const app = document.getElementById('app');
+            app.innerHTML = Sidebar() + getMainContent();
+        }
+
+        function getMainContent() {
+            switch(state.currentTab) {
+                case 'dashboard': return DashboardView();
+                case 'grievances': return GrievancesView();
+                case 'workforce': return WorkforceView();
+                case 'analytics': return AnalyticsView();
+                default: return DashboardView();
+            }
+        }
+
+        function switchTab(tab) {
+            if (tab === 'map' || tab === 'settings') {
+                alert("This module is currently under development.");
+                return;
+            }
+            state.currentTab = tab;
+            render();
+        }
+
+        function toggleTheme() {
+            state.darkMode = !state.darkMode;
+            document.documentElement.classList.toggle('dark');
+            render();
+            // Re-init charts if we are on analytics page to update colors
+            if (state.currentTab === 'analytics') {
+                setTimeout(initCharts, 100);
+            }
+        }
+
+        // --- CHART INITIALIZATION ---
+
+        function initCharts() {
+            const ctx1 = document.getElementById('trendChart');
+            const ctx2 = document.getElementById('categoryChart');
+
+            if (!ctx1 || !ctx2) return;
+
+            // Destroy existing charts to prevent memory leaks/glitches
+            if (charts.trend) charts.trend.destroy();
+            if (charts.category) charts.category.destroy();
+
+            const isDark = state.darkMode;
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+
+            charts.trend = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                    datasets: [{
+                        label: 'Grievance Volume',
+                        data: [150, 230, 180, 310],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#3b82f6',
+                        pointBorderWidth: 2
+                    }, {
+                        label: 'Resolution Rate (%)',
+                        data: [85, 89, 83, 92],
+                        borderColor: '#10b981',
+                        borderDash: [5, 5],
+                        tension: 0.4,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#10b981',
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8, color: textColor } } },
+                    scales: {
+                        x: { grid: { display: false, drawBorder: false }, ticks: { color: textColor } },
+                        y: { grid: { color: gridColor, borderDash: [5, 5] }, ticks: { color: textColor } },
+                        y1: { position: 'right', grid: { display: false }, ticks: { color: textColor } }
+                    }
+                }
+            });
+
+            charts.category = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Road', 'Water', 'Electric', 'Sanitation'],
+                    datasets: [{
+                        data: [35, 25, 20, 20],
+                        backgroundColor: ['#3b82f6', '#22d3ee', '#fbbf24', '#34d399'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    cutout: '75%',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // --- INIT ---
+        render();
+
+    </script>
+</body>
+</html>
